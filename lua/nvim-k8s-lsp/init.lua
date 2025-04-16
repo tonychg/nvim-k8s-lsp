@@ -47,6 +47,9 @@ function M:get_schema_url(attributes)
 
   if is_builtin(attributes) then
     local suffix = attributes.version
+    if attributes.group == "rbac.authorization.k8s.io" then
+      group = "rbac"
+    end
     if attributes.group then
       suffix = string.format("%s-%s", group, version)
     end
