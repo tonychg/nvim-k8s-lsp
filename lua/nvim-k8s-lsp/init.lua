@@ -2,7 +2,7 @@ local M = {}
 local config
 
 local store_builtins_url =
-  "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/%s-standalone-strict/%s-%s-%s.json"
+  "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/%s-standalone-strict/%s-%s.json"
 local store_crds_url = "https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/%s/%s_%s.json"
 
 local defaults = {
@@ -38,7 +38,7 @@ local function is_builtin(attributes)
   return table_contains(builtins, attributes.kind)
 end
 
-local function get_schema_url(kubernetes_version, attributes)
+function M:get_schema_url(attributes)
   local schema_url
   local kind = string.lower(attributes.kind)
   local group = attributes.group
@@ -46,7 +46,11 @@ local function get_schema_url(kubernetes_version, attributes)
   local base_url = store_builtins_url
 
   if is_builtin(attributes) then
-    schema_url = string.format(base_url, kubernetes_version, kind, group, version)
+    local suffix = attributes.version
+    if attributes.group then
+      suffix = string.format("%s-%s", group, version)
+    end
+    schema_url = string.format(base_url, config.kubernetes_version, kind, suffix)
   else
     base_url = store_crds_url
     schema_url = string.format(base_url, group, kind, version)
@@ -83,8 +87,13 @@ function M:extract_api_attributes(bufnr)
 
     if api_version then
       local split = vim.split(api_version, "/", { plain = true })
-      attributes.group = split[1]
-      attributes.version = split[2]
+      if #split == 2 then
+        attributes.group = split[1]
+        attributes.version = split[2]
+      end
+      if #split == 1 then
+        attributes.version = split[1]
+      end
     end
 
     local kind = extract_kind(line)
@@ -107,8 +116,8 @@ end
 function M:associate_schema_to_buffer(client, bufnr)
   local attributes = M:extract_api_attributes(bufnr)
 
-  if attributes.kind and attributes.version and attributes.group then
-    local schema_url = get_schema_url(config.kubernetes_version, attributes)
+  if attributes.kind and attributes.version then
+    local schema_url = M:get_schema_url(attributes)
     local settings = client.settings
     local bufuri = vim.uri_from_bufnr(bufnr)
     local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
