@@ -5,7 +5,7 @@ local M = {
       lualine = false,
     },
   },
-  {},
+  config = {},
 }
 
 local store_builtins_url =
@@ -41,6 +41,14 @@ local function is_builtin(attributes)
   return table_contains(builtins, attributes.kind)
 end
 
+local function is_helm()
+  local filepath = vim.fn.expand("%:p")
+  if vim.regex([[\v(templates).*\.(ya?ml|tpl|txt)$]]):match_str(filepath) then
+    return true
+  end
+  return false
+end
+
 function M.get_schema_url(attributes)
   local schema_url
   local kind = string.lower(attributes.kind)
@@ -52,6 +60,9 @@ function M.get_schema_url(attributes)
     local suffix = attributes.version
     if attributes.group == "rbac.authorization.k8s.io" then
       group = "rbac"
+    end
+    if attributes.group == "networking.k8s.io" then
+      group = "networking"
     end
     if attributes.group then
       suffix = string.format("%s-%s", group, version)
@@ -114,8 +125,12 @@ end
 
 function M.lualine()
   local attributes = M.extract_api_attributes(vim.api.nvim_get_current_buf())
+  local helm_suffix = ""
+  if is_helm() then
+    helm_suffix = ":helm"
+  end
   if attributes.kind then
-    return string.format([[%s:%s]], M.config.kubernetes_version, attributes.kind)
+    return string.format([[%s:%s%s]], M.config.kubernetes_version, attributes.kind, helm_suffix)
   else
     return [[]]
   end
@@ -124,8 +139,32 @@ end
 function M.reload_yaml_lsp(client, bufnr, settings)
   local bufuri = vim.uri_from_bufnr(bufnr)
 
-  client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
-  client:request_sync("yaml/get/jsonSchema", { bufuri }, 50000, bufnr)
+  if client.name == "helm" then
+    vim.lsp.config("helm", {
+      cmd = { "helm_ls", "serve" },
+      root_markers = { "values.yaml", "Chart.yaml" },
+      settings = settings,
+    })
+  else
+    client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
+    client:request_sync("yaml/get/jsonSchema", { bufuri }, 50000, bufnr)
+  end
+end
+
+function M.deactivate_other_lsp(bufnr)
+  local clients = vim.lsp.get_clients({ bufnr = bufnr })
+
+  for _, client in pairs(clients) do
+    if is_helm() then
+      if client.name == "yaml" then
+        vim.lsp.stop_client(client.id, true)
+      end
+    else
+      if client.name == "helm" then
+        vim.lsp.stop_client(client.id, true)
+      end
+    end
+  end
 end
 
 function M.associate_schema_to_buffer(client, bufnr)
@@ -133,11 +172,24 @@ function M.associate_schema_to_buffer(client, bufnr)
 
   if attributes.kind and attributes.version then
     local schema_url = M.get_schema_url(attributes)
-    local settings = client.settings
     local bufuri = vim.uri_from_bufnr(bufnr)
-    local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
-    settings.yaml.schemas = schemas
-    M.reload_yaml_lsp(client, bufnr, settings)
+
+    if client.name == "yaml" and not is_helm() then
+      local settings = client.settings
+      local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
+      settings.yaml.schemas = schemas
+      M.reload_yaml_lsp(client, bufnr, settings)
+    end
+
+    if client.name == "helm" then
+      local settings = client.settings
+      if settings["helm-ls"] and settings["helm-ls"].yamlls and settings["helm-ls"].yamlls.config then
+        local yaml_settings = settings["helm-ls"].yamlls.config
+        local schemas = build_schemas(yaml_settings.schemas, schema_url, bufuri)
+        settings["helm-ls"].yamlls.config.schemas = schemas
+        M.reload_yaml_lsp(client, bufnr, settings)
+      end
+    end
   end
 end
 
@@ -180,7 +232,8 @@ function M.setup(user_configuration)
       if not client then
         return
       end
-      if client.name == "yaml" then
+      if client.name == "yaml" or client.name == "helm" then
+        M.deactivate_other_lsp(bufnr)
         M.associate_schema_to_buffer(client, bufnr)
       end
     end,

@@ -238,7 +238,6 @@ return {
   "Event",
   "EventList",
   "EventSeries",
-  "EventSource",
   "ExecAction",
   "FCVolumeSource",
   "FlexPersistentVolumeSource",
