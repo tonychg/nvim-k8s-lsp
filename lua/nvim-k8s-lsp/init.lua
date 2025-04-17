@@ -1,6 +1,22 @@
 local M = {
   default_options = {
     kubernetes_version = "v1.32.2",
+    lsp = {
+      clients = {
+        yaml = "yaml",
+        helm = "helm",
+      },
+    },
+    schema_stores = {
+      kubernetes = {
+        repo = "yannh/kubernetes-json-schema",
+        branch = "master",
+      },
+      kubernetes_crds = {
+        repo = "datreeio/CRDs-catalog",
+        branch = "main",
+      },
+    },
     integrations = {
       lualine = false,
     },
@@ -8,9 +24,8 @@ local M = {
   config = {},
 }
 
-local store_builtins_url =
-  "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/%s-standalone-strict/%s-%s.json"
-local store_crds_url = "https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/%s/%s_%s.json"
+local store_builtins_url = "https://raw.githubusercontent.com/%s/refs/heads/%s/%s-standalone-strict/%s-%s.json"
+local store_crds_url = "https://raw.githubusercontent.com/%s/refs/heads/%s/%s/%s_%s.json"
 
 local function table_contains(tbl, x)
   local found = false
@@ -67,10 +82,12 @@ function M.get_schema_url(attributes)
     if attributes.group then
       suffix = string.format("%s-%s", group, version)
     end
-    schema_url = string.format(base_url, M.config.kubernetes_version, kind, suffix)
+    local store = M.config.schema_stores.kubernetes
+    schema_url = string.format(base_url, store.repo, store.branch, M.config.kubernetes_version, kind, suffix)
   else
+    local store = M.config.schema_stores.kubernetes_crds
     base_url = store_crds_url
-    schema_url = string.format(base_url, group, kind, version)
+    schema_url = string.format(base_url, store.repo, store.branch, group, kind, version)
   end
 
   return schema_url
@@ -139,7 +156,7 @@ end
 function M.reload_yaml_lsp(client, bufnr, settings)
   local bufuri = vim.uri_from_bufnr(bufnr)
 
-  if client.name == "helm" then
+  if client.name == M.config.lsp.clients.helm then
     client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
   else
     client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
@@ -152,11 +169,11 @@ function M.deactivate_other_lsp(bufnr)
 
   for _, client in pairs(clients) do
     if is_helm() then
-      if client.name == "yaml" then
+      if client.name == M.config.lsp.clients.yaml then
         vim.lsp.stop_client(client.id, true)
       end
     else
-      if client.name == "helm" then
+      if client.name == M.config.lsp.clients.helm then
         vim.lsp.stop_client(client.id, true)
       end
     end
@@ -170,14 +187,14 @@ function M.associate_schema_to_buffer(client, bufnr)
     local schema_url = M.get_schema_url(attributes)
     local bufuri = vim.uri_from_bufnr(bufnr)
 
-    if client.name == "yaml" and not is_helm() then
+    if client.name == M.config.lsp.clients.yaml and not is_helm() then
       local settings = client.settings
       local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
       settings.yaml.schemas = schemas
       M.reload_yaml_lsp(client, bufnr, settings)
     end
 
-    if client.name == "helm" then
+    if client.name == M.config.lsp.clients.helm then
       local settings = client.settings
       if settings["helm-ls"] and settings["helm-ls"].yamlls and settings["helm-ls"].yamlls.config then
         local yaml_settings = settings["helm-ls"].yamlls.config
@@ -228,7 +245,7 @@ function M.setup(user_configuration)
       if not client then
         return
       end
-      if client.name == "yaml" or client.name == "helm" then
+      if client.name == M.config.lsp.clients.yaml or client.name == M.config.lsp.clients.helm then
         M.deactivate_other_lsp(bufnr)
         M.associate_schema_to_buffer(client, bufnr)
       end
