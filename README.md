@@ -29,6 +29,36 @@ return {
 }
 ```
 
+**nix**
+
+```nix
+{
+    pkgs,
+    ...
+}: let
+  nvim-k8s-lsp = pkgs.vimUtils.buildVimPlugin {
+    pname = "nvim-k8s-lsp";
+    version = "main";
+    src = builtins.fetchGit {
+      url = "https://github.com/tonychg/nvim-k8s-lsp.git";
+      rev = "da0a121a34eabef458acda13997bc6ab69790073";
+      ref = "main";
+    };
+  };
+in
+  programs.neovim = {
+      plugins = with pkgs; [
+          {
+            plugin = nvim-k8s-lsp;
+            type = "lua";
+          }
+      ]
+      extraPackages = with pkgs; [
+        yaml-language-server
+      ]
+  }
+```
+
 ## 🪜 TODO
 
 - Support [helm_ls](https://github.com/mrjosh/helm-ls)
