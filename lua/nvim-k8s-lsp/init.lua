@@ -1,13 +1,15 @@
-local M = {}
-local config
+local M = {
+  default_options = {
+    kubernetes_version = "v1.32.2",
+    integrations = {
+      lualine = false,
+    },
+  },
+}
 
 local store_builtins_url =
   "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/%s-standalone-strict/%s-%s.json"
 local store_crds_url = "https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/%s/%s_%s.json"
-
-local defaults = {
-  kubernetes_version = "v1.32.2",
-}
 
 local function table_contains(tbl, x)
   local found = false
@@ -38,7 +40,7 @@ local function is_builtin(attributes)
   return table_contains(builtins, attributes.kind)
 end
 
-function M:get_schema_url(attributes)
+function M.get_schema_url(attributes)
   local schema_url
   local kind = string.lower(attributes.kind)
   local group = attributes.group
@@ -53,7 +55,7 @@ function M:get_schema_url(attributes)
     if attributes.group then
       suffix = string.format("%s-%s", group, version)
     end
-    schema_url = string.format(base_url, config.kubernetes_version, kind, suffix)
+    schema_url = string.format(base_url, M.config.kubernetes_version, kind, suffix)
   else
     base_url = store_crds_url
     schema_url = string.format(base_url, group, kind, version)
@@ -81,7 +83,7 @@ local function build_schemas(source_schemas, schema_url, bufuri)
   return schemas
 end
 
-function M:extract_api_attributes(bufnr)
+function M.extract_api_attributes(bufnr)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local attributes = {}
 
@@ -109,31 +111,56 @@ function M:extract_api_attributes(bufnr)
   return attributes
 end
 
-function M:reload_yaml_lsp(client, bufnr, settings)
+function M.lualine()
+  local attributes = M.extract_api_attributes(vim.api.nvim_get_current_buf())
+  if attributes.kind then
+    return string.format([[%s:%s]], M.config.kubernetes_version, attributes.kind)
+  else
+    return [[]]
+  end
+end
+
+function M.reload_yaml_lsp(client, bufnr, settings)
   local bufuri = vim.uri_from_bufnr(bufnr)
 
   client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
   client:request_sync("yaml/get/jsonSchema", { bufuri }, 50000, bufnr)
 end
 
-function M:associate_schema_to_buffer(client, bufnr)
-  local attributes = M:extract_api_attributes(bufnr)
+function M.associate_schema_to_buffer(client, bufnr)
+  local attributes = M.extract_api_attributes(bufnr)
 
   if attributes.kind and attributes.version then
-    local schema_url = M:get_schema_url(attributes)
+    local schema_url = M.get_schema_url(attributes)
     local settings = client.settings
     local bufuri = vim.uri_from_bufnr(bufnr)
     local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
     settings.yaml.schemas = schemas
-    M:reload_yaml_lsp(client, bufnr, settings)
+    M.reload_yaml_lsp(client, bufnr, settings)
   end
 end
 
-function M:setup(opts)
-  config = defaults
+function M.load_lualine()
+  local lualine = require("lualine")
 
-  if opts then
-    config = vim.tbl_deep_extend("force", opts, config)
+  if lualine then
+    local config = lualine.get_config()
+    local lualine_x = { M.lualine }
+    for _, v in pairs(config.sections.lualine_x) do
+      table.insert(lualine_x, v)
+    end
+    config.sections.lualine_x = lualine_x
+    lualine.setup(config)
+  end
+end
+
+function M.setup(user_configuration)
+  user_configuration = user_configuration or {}
+
+  M.config = vim.tbl_deep_extend("keep", user_configuration, M.default_options)
+
+  if M.config.integrations.lualine then
+    M.load_lualine()
   end
 
   vim.api.nvim_create_autocmd("LspAttach", {
@@ -145,7 +172,7 @@ function M:setup(opts)
         return
       end
       if client.name == "yaml" then
-        M:associate_schema_to_buffer(client, bufnr)
+        M.associate_schema_to_buffer(client, bufnr)
       end
     end,
   })
