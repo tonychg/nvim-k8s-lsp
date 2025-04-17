@@ -140,11 +140,7 @@ function M.reload_yaml_lsp(client, bufnr, settings)
   local bufuri = vim.uri_from_bufnr(bufnr)
 
   if client.name == "helm" then
-    vim.lsp.config("helm", {
-      cmd = { "helm_ls", "serve" },
-      root_markers = { "values.yaml", "Chart.yaml" },
-      settings = settings,
-    })
+    client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
   else
     client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
     client:request_sync("yaml/get/jsonSchema", { bufuri }, 50000, bufnr)
@@ -186,8 +182,8 @@ function M.associate_schema_to_buffer(client, bufnr)
       if settings["helm-ls"] and settings["helm-ls"].yamlls and settings["helm-ls"].yamlls.config then
         local yaml_settings = settings["helm-ls"].yamlls.config
         local schemas = build_schemas(yaml_settings.schemas, schema_url, bufuri)
-        settings["helm-ls"].yamlls.config.schemas = schemas
-        M.reload_yaml_lsp(client, bufnr, settings)
+        yaml_settings.schemas = schemas
+        M.reload_yaml_lsp(client, bufnr, yaml_settings)
       end
     end
   end
