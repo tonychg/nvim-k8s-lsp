@@ -5,6 +5,7 @@ local M = {
       lualine = false,
     },
   },
+  {},
 }
 
 local store_builtins_url =
@@ -154,6 +155,10 @@ function M.load_lualine()
   end
 end
 
+function M.switch_version(kubernetes_version)
+  M.config.kubernetes_version = kubernetes_version
+end
+
 function M.setup(user_configuration)
   user_configuration = user_configuration or {}
 
@@ -162,6 +167,10 @@ function M.setup(user_configuration)
   if M.config.integrations.lualine then
     M.load_lualine()
   end
+
+  vim.api.nvim_create_user_command("KubeSwitchVersion", function(inp)
+    M.switch_version(inp.args)
+  end, { nargs = 1 })
 
   vim.api.nvim_create_autocmd("LspAttach", {
     pattern = { "*.yaml", "*.yml" },
