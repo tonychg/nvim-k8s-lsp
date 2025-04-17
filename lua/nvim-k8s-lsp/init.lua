@@ -73,11 +73,9 @@ function M.get_schema_url(attributes)
 
   if is_builtin(attributes) then
     local suffix = attributes.version
-    if attributes.group == "rbac.authorization.k8s.io" then
-      group = "rbac"
-    end
-    if attributes.group == "networking.k8s.io" then
-      group = "networking"
+    if vim.regex([[^\a+.*\.k8s\.io$]]) then
+      local split = vim.split(attributes.group, ".", { plain = true })
+      group = split[1]
     end
     if attributes.group then
       suffix = string.format("%s-%s", group, version)
@@ -115,8 +113,13 @@ end
 function M.extract_api_attributes(bufnr)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local attributes = {}
+  local i = 0
 
   for _, line in ipairs(lines) do
+    if attributes.version and attributes.kind or i >= 100 then
+      break
+    end
+
     local api_version = extract_api_version(line)
 
     if api_version then
@@ -135,6 +138,7 @@ function M.extract_api_attributes(bufnr)
     if kind then
       attributes.kind = kind
     end
+    i = i + 1
   end
 
   return attributes
@@ -154,28 +158,18 @@ function M.lualine()
 end
 
 function M.reload_yaml_lsp(client, bufnr, settings)
-  local bufuri = vim.uri_from_bufnr(bufnr)
-
-  if client.name == M.config.lsp.clients.helm then
-    client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
-  else
-    client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
-    client:request_sync("yaml/get/jsonSchema", { bufuri }, 50000, bufnr)
-  end
+  client:notify("workspace/didChangeConfiguration", { settings = settings }, 50000, bufnr)
 end
 
 function M.deactivate_other_lsp(bufnr)
   local clients = vim.lsp.get_clients({ bufnr = bufnr })
 
   for _, client in pairs(clients) do
-    if is_helm() then
-      if client.name == M.config.lsp.clients.yaml then
-        vim.lsp.stop_client(client.id, true)
-      end
-    else
-      if client.name == M.config.lsp.clients.helm then
-        vim.lsp.stop_client(client.id, true)
-      end
+    if
+      (is_helm() and client.name == M.config.lsp.clients.yaml)
+      or (not is_helm() and client.name == M.config.lsp.clients.helm)
+    then
+      vim.lsp.stop_client(client.id, true)
     end
   end
 end
@@ -186,23 +180,22 @@ function M.associate_schema_to_buffer(client, bufnr)
   if attributes.kind and attributes.version then
     local schema_url = M.get_schema_url(attributes)
     local bufuri = vim.uri_from_bufnr(bufnr)
+    local settings = client.settings
 
     if client.name == M.config.lsp.clients.yaml and not is_helm() then
-      local settings = client.settings
       local schemas = build_schemas(settings.yaml.schemas, schema_url, bufuri)
       settings.yaml.schemas = schemas
-      M.reload_yaml_lsp(client, bufnr, settings)
     end
 
     if client.name == M.config.lsp.clients.helm then
-      local settings = client.settings
       if settings["helm-ls"] and settings["helm-ls"].yamlls and settings["helm-ls"].yamlls.config then
-        local yaml_settings = settings["helm-ls"].yamlls.config
-        local schemas = build_schemas(yaml_settings.schemas, schema_url, bufuri)
-        yaml_settings.schemas = schemas
-        M.reload_yaml_lsp(client, bufnr, yaml_settings)
+        settings = settings["helm-ls"].yamlls.config
+        local schemas = build_schemas(settings.schemas, schema_url, bufuri)
+        settings.schemas = schemas
       end
     end
+
+    M.reload_yaml_lsp(client, bufnr, settings)
   end
 end
 

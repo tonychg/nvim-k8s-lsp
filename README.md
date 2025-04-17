@@ -19,6 +19,7 @@ Inspired by [someone-stole-my-name/yaml-companion.nvim](https://github.com/someo
 - Schemas detection
 - Native CRD matching
 - Minimalist
+- Dynamic `yaml-language-server` and `helm-ls` reload
 
 ## 👍 Setup
 
