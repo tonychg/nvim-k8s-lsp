@@ -6,13 +6,19 @@ Experimental plugin to auto-detect Kubernetes schemas.
 
 Inspired by [someone-stole-my-name/yaml-companion.nvim](https://github.com/someone-stole-my-name/yaml-companion.nvim)
 
+This plugin is in the early development phase.
+I developed it because I couldn't find a good solution and it helps me in my daily work.
+
 </div>
 
 ## 🦶 Requirements
 
 - [yaml-language-server](https://github.com/redhat-developer/yaml-language-server)
 - [neovim](https://github.com/neovim/neovim) (0.11 or higher)
-- [helm-ls](https://github.com/tonychg/helm-ls) (You need the patched version)
+- [helm-ls](https://github.com/mrjosh/helm-ls) (You need the [patched](https://github.com/tonychg/helm-ls) version)
+
+Disclaimer: I had to fork `helm-ls` because it didn't implement the `workspace/didChangeConfiguration` method.
+There must be a better solution, but for the moment this one works for my use-case.
 
 ## 🍚 Concept
 
