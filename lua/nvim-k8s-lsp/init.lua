@@ -38,14 +38,14 @@ local function table_contains(tbl, x)
 end
 
 local function extract_api_version(line)
-  local _, e = vim.regex([[^apiVersion: .*$]]):match_str(line)
+  local _, e = vim.regex([[^apiVersion: [a-zA-Z0-9-/\.]\+$]]):match_str(line)
   if e then
     return string.sub(line, 13, e)
   end
 end
 
 local function extract_kind(line)
-  local _, e = vim.regex([[^kind: .*$]]):match_str(line)
+  local _, e = vim.regex([[^kind: [a-zA-Z]\+$]]):match_str(line)
   if e then
     return string.sub(line, 7, e)
   end
