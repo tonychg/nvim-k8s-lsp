@@ -107,6 +107,7 @@ return {
           hover = true,
           schemas = {
             -- Add pre-configured schemas
+            -- Must not match any kubernetes manifests to avoid duplicate match
           },
         },
       },
@@ -130,6 +131,7 @@ return {
       trace = { server = "debug" },
       schemas = {
         -- Add pre-configured schemas
+        -- Must not match any kubernetes manifests to avoid duplicate match
       },
     },
   },
