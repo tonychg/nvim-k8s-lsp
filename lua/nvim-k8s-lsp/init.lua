@@ -73,7 +73,7 @@ function M.get_schema_url(attributes)
 
   if is_builtin(attributes) then
     local suffix = attributes.version
-    if attributes.group and vim.regex([[^\a+.*\.k8s\.io$]]):match_str(attributes.group) then
+    if attributes.group and vim.regex([[^\a\+.*\.k8s\.io$]]):match_str(attributes.group) then
       local split = vim.split(attributes.group, ".", { plain = true })
       group = split[1]
     end
