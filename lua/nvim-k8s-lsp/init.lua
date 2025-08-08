@@ -20,6 +20,11 @@ local M = {
     integrations = {
       lualine = false,
     },
+    ignore_groups = {
+      "kind.x-k8s.io",
+      "kustomize.config.k8s.io",
+      "viaduct.ai",
+    },
   },
   config = {},
 }
@@ -178,6 +183,12 @@ function M.associate_schema_to_buffer(client, bufnr)
   local attributes = M.extract_api_attributes(bufnr)
 
   if attributes.kind and attributes.version then
+    for _, group in ipairs(M.config.ignore_groups) do
+      if group == attributes.group then
+        return
+      end
+    end
+
     local schema_url = M.get_schema_url(attributes)
     local bufuri = vim.uri_from_bufnr(bufnr)
     local settings = client.settings
