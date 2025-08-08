@@ -15,7 +15,7 @@ I developed it because I couldn't find a good solution and it helps me in my dai
 
 - [yaml-language-server](https://github.com/redhat-developer/yaml-language-server)
 - [neovim](https://github.com/neovim/neovim) (0.11 or higher)
-- [helm-ls](https://github.com/mrjosh/helm-ls) (You need the [patched](https://github.com/tonychg/helm-ls) version)
+- [helm-ls](https://github.com/mrjosh/helm-ls) (0.4.0 or higher)
 
 Disclaimer: I had to fork `helm-ls` because it didn't implement the `workspace/didChangeConfiguration` method.
 There must be a better solution, but for the moment this one works for my use-case.
