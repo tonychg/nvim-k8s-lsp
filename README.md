@@ -58,6 +58,11 @@ return {
       integrations = {
         lualine = false,
       },
+      ignore_groups = {
+        "kind.x-k8s.io",
+        "kustomize.config.k8s.io",
+        "viaduct.ai",
+      },
     })
   end,
 }
